@@ -59,6 +59,7 @@
     sparkDark: "#6f43aa",
     leaf: "#65e69d",
     leafDark: "#27875a",
+    hazard: "#ffe05a",
     gold: "#ffd66b",
     stone: "#29345f",
     stoneTop: "#465586",
@@ -111,16 +112,15 @@
     { x: 760, y: 440, w: 210, h: 22 },
     { x: 990, y: 360, w: 135, h: 22 },
     { x: 1390, y: 445, w: 170, h: 22 },
-    { x: 1590, y: 370, w: 150, h: 22 },
-    { x: 1990, y: 430, w: 250, h: 22 }
+    { x: 1590, y: 370, w: 150, h: 22 }
   ];
 
   const hazards = [
-    { x: 425, y: 530, w: 90, h: 18, type: "water" },
-    { x: 785, y: 530, w: 105, h: 18, type: "fire" },
-    { x: 1045, y: 530, w: 92, h: 18, type: "water" },
-    { x: 1485, y: 530, w: 110, h: 18, type: "fire" },
-    { x: 2040, y: 530, w: 88, h: 18, type: "water" }
+    { x: 425, y: 530, w: 90, h: 18 },
+    { x: 785, y: 530, w: 105, h: 18 },
+    { x: 1045, y: 530, w: 92, h: 18 },
+    { x: 1485, y: 530, w: 110, h: 18 },
+    { x: 2080, y: 530, w: 54, h: 18 }
   ];
 
   const portal = { x: 2250, y: 477, occupied: false };
@@ -308,7 +308,7 @@
   function updatePlayer(player, dt) {
     if (player.atGoal) return;
     const speed = 250;
-    const jump = 560;
+    const jump = 600;
     const left = keys.ArrowLeft || keys.KeyA || keys.touchLeft;
     const right = keys.ArrowRight || keys.KeyD || keys.touchRight;
     player.vx = left === right ? player.vx * .76 : (left ? -speed : speed);
@@ -474,7 +474,7 @@
     });
 
     hazards.forEach((hazard) => {
-      const color = hazard.type === "fire" ? colors.fire : colors.water;
+      const color = colors.hazard;
       ctx.fillStyle = color;
       ctx.shadowColor = color;
       ctx.shadowBlur = 16;
