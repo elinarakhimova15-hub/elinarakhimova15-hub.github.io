@@ -6,15 +6,15 @@
     <meta name="theme-color" content="#111732" />
     <meta
       name="description"
-      content="Учебная платформенная игра для 5–6 классов: выбери героя, решай задачи, открывай древние двери и проходи Храм дробей."
+      content="Учебная платформенная игра по математике: выбери героя, решай задачи по теме «Степени» и открывай новые уровни."
     />
     <link
       rel="icon"
       type="image/svg+xml"
       href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='15' fill='%23111732'/%3E%3Ccircle cx='21' cy='21' r='9' fill='%23ff8154'/%3E%3Ccircle cx='43' cy='21' r='9' fill='%2354d7ff'/%3E%3Ccircle cx='21' cy='43' r='9' fill='%23c891ff'/%3E%3Ccircle cx='43' cy='43' r='9' fill='%2365e69d'/%3E%3C/svg%3E"
     />
-    <title>Храм дробей — математическое приключение</title>
-    <link rel="stylesheet" href="./styles.css" />
+    <title>Храм математики — тема «Степени»</title>
+    <link rel="stylesheet" href="./styles.css?v=powers-theme-1" />
   </head>
   <body>
     <main class="page-shell">
@@ -26,7 +26,7 @@
           </div>
           <div>
             <p class="eyebrow">Математическое приключение</p>
-            <h1>Храм дробей</h1>
+            <h1>Храм математики</h1>
           </div>
         </div>
 
@@ -36,8 +36,12 @@
             <strong id="heroName"><span class="hero-dot fire"></span> Огонёк</strong>
           </div>
           <div class="hud-item">
+            <span class="hud-label">Уровень</span>
+            <strong id="levelText">1 / 6</strong>
+          </div>
+          <div class="hud-item">
             <span class="hud-label">Испытания</span>
-            <strong id="progressText">0 / 3</strong>
+            <strong id="progressText">0 / 6</strong>
           </div>
           <div class="hud-item">
             <span class="hud-label">Сердца</span>
@@ -51,13 +55,7 @@
           <span class="mission-icon" aria-hidden="true">◇</span>
           <p id="missionText"><strong>Цель:</strong> проведи своего героя к порталу</p>
         </div>
-        <div class="gate-progress" aria-label="Прогресс испытаний">
-          <span class="gate-step" data-gate="0">1</span>
-          <span class="gate-line"></span>
-          <span class="gate-step" data-gate="1">2</span>
-          <span class="gate-line"></span>
-          <span class="gate-step" data-gate="2">3</span>
-        </div>
+        <div class="gate-progress" id="gateProgress" aria-label="Прогресс испытаний"></div>
         <button class="sound-button" id="soundButton" type="button" aria-pressed="true" aria-label="Выключить звук">♪</button>
       </section>
 
@@ -72,9 +70,11 @@
           ></canvas>
 
           <div class="start-screen" id="startScreen">
-            <p class="level-kicker">Уровень 1</p>
-            <h2>Выбери своего героя</h2>
-            <p>Кто отправится открывать математические двери?</p>
+            <p class="level-kicker">Тема: Степени · 7 класс</p>
+            <h2>Выбери уровень и героя</h2>
+            <p id="topicProgress">Пройди 6 уровней и реши все 24 задания домашней работы.</p>
+            <div class="level-picker" id="levelPicker" role="group" aria-label="Уровни темы «Степени»"></div>
+            <p class="picker-label">Выбери героя</p>
             <div class="hero-picker" role="group" aria-label="Выбор героя">
               <button class="hero-choice selected" type="button" data-hero="fire" aria-pressed="true">
                 <span class="hero-preview fire" aria-hidden="true"><i></i><i></i></span>
@@ -93,7 +93,7 @@
                 <strong>Листик</strong>
               </button>
             </div>
-            <button class="primary-button" id="startButton" type="button">Играть за Огонька</button>
+            <button class="primary-button" id="startButton" type="button">Начать уровень 1</button>
           </div>
 
           <div class="action-prompt" id="actionPrompt" hidden>
@@ -126,23 +126,20 @@
         </div>
       </section>
 
-      <p class="teacher-note"><strong>Навык уровня:</strong> порядок действий, сложение дробей и проценты</p>
+      <p class="teacher-note" id="teacherNote"><strong>Тема:</strong> степени с натуральным показателем</p>
     </main>
 
     <dialog class="challenge-dialog" id="challengeDialog">
       <form method="dialog" id="challengeForm">
         <div class="dialog-topline">
-          <span class="challenge-number" id="challengeNumber">Испытание 1 из 3</span>
+          <span class="challenge-number" id="challengeNumber">Испытание 1 из 6</span>
           <button class="close-button" value="cancel" aria-label="Закрыть задачу" type="submit">×</button>
         </div>
         <div class="challenge-icon" id="challengeIcon" aria-hidden="true">✦</div>
         <h2 id="challengeTitle">Зал порядка</h2>
         <p class="challenge-question" id="challengeQuestion"></p>
-        <label class="answer-label" for="answerInput">Твой ответ</label>
-        <div class="answer-row">
-          <input id="answerInput" name="answer" inputmode="text" autocomplete="off" placeholder="Введи ответ" />
-          <button class="primary-button" id="answerButton" type="submit" value="answer">Проверить</button>
-        </div>
+        <p class="answer-label">Выбери ответ</p>
+        <div class="choice-grid" id="choiceGrid" role="group" aria-label="Варианты ответа"></div>
         <p class="feedback" id="answerFeedback" aria-live="polite"></p>
         <button class="hint-button" id="hintButton" type="button">Показать подсказку</button>
         <div class="hint-box" id="hintBox" hidden></div>
@@ -151,14 +148,17 @@
 
     <dialog class="result-dialog" id="resultDialog">
       <div class="result-stars" aria-hidden="true">✦ ★ ✦</div>
-      <p class="level-kicker">Уровень пройден</p>
-      <h2>Храм снова ожил!</h2>
-      <p>Ты открыл все двери и помог своему герою добраться до портала.</p>
+      <p class="level-kicker" id="resultKicker">Уровень пройден</p>
+      <h2 id="resultTitle">Отличная работа!</h2>
+      <p id="resultMessage">Ты решил все задания уровня и помог своему герою добраться до портала.</p>
       <div class="result-grid">
-        <div><span>3 / 3</span><small>задачи решены</small></div>
+        <div><span id="resultTasks">6 / 6</span><small>задачи решены</small></div>
         <div><span id="resultLives">3</span><small>сердца осталось</small></div>
       </div>
-      <button class="primary-button" id="playAgainButton" type="button">Пройти ещё раз</button>
+      <div class="result-actions">
+        <button class="primary-button" id="nextLevelButton" type="button">Следующий уровень</button>
+        <button class="secondary-button" id="chooseLevelButton" type="button">К карте уровней</button>
+      </div>
     </dialog>
 
     <dialog class="result-dialog fail" id="failDialog">
@@ -169,6 +169,7 @@
       <button class="primary-button" id="tryAgainButton" type="button">Вернуться в храм</button>
     </dialog>
 
-    <script src="./game.js?v=hazard-fix-1"></script>
+    <script src="./levels.js?v=powers-theme-1"></script>
+    <script src="./game.js?v=powers-theme-1"></script>
   </body>
 </html>
