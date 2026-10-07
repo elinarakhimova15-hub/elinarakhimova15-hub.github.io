@@ -1,13 +1,18 @@
 (() => {
   "use strict";
 
-  const levels = window.POWERS_LEVELS;
+  const topics = window.MATH_TOPICS?.length
+    ? window.MATH_TOPICS
+    : [{ id: "powers", title: "Степени", grade: "7 класс", description: "6 уровней · 24 задания", levels: window.POWERS_LEVELS }];
+  let currentTopicIndex = 0;
+  let levels = topics[currentTopicIndex].levels;
   const canvas = document.getElementById("gameCanvas");
   const ctx = canvas.getContext("2d");
   const byId = (id) => document.getElementById(id);
   const ui = {
     startScreen: byId("startScreen"), startButton: byId("startButton"),
-    topicProgress: byId("topicProgress"), levelPicker: byId("levelPicker"),
+    topicKicker: byId("topicKicker"), topicProgress: byId("topicProgress"),
+    topicPicker: byId("topicPicker"), levelPicker: byId("levelPicker"),
     heroName: byId("heroName"), levelText: byId("levelText"),
     progressText: byId("progressText"), livesText: byId("livesText"),
     missionText: byId("missionText"), gateProgress: byId("gateProgress"),
@@ -30,7 +35,8 @@
   const VIEW_W = canvas.width;
   const VIEW_H = canvas.height;
   const FLOOR_Y = 545;
-  const STORAGE_KEY = "math-temple-powers-progress-v1";
+  const STORAGE_KEY = "math-temple-progress-v2";
+  const LEGACY_STORAGE_KEY = "math-temple-powers-progress-v1";
   const keys = Object.create(null);
   const colors = {
     fire: "#ff8154", fireDark: "#b94225", water: "#54d7ff", waterDark: "#187ca8",
@@ -81,7 +87,8 @@
   let springs = [];
   let decorations = [];
   let portal = { x: 2250, y: 477, occupied: false };
-  let completedLevels = new Set();
+  let progressByTopic = Object.fromEntries(topics.map((topic) => [topic.id, new Set()]));
+  let completedLevels = progressByTopic[topics[currentTopicIndex].id];
   let seenTips = new Set();
 
   function makePlayer(type, x = 105) {
@@ -95,16 +102,31 @@
 
   function loadProgress() {
     try {
-      const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
-      if (Array.isArray(saved.completed)) {
-        completedLevels = new Set(saved.completed.filter((item) => Number.isInteger(item) && item >= 0 && item < levels.length));
+      const savedRaw = localStorage.getItem(STORAGE_KEY);
+      const legacyRaw = localStorage.getItem(LEGACY_STORAGE_KEY);
+      const saved = JSON.parse(savedRaw || "{}");
+      const legacy = savedRaw ? {} : JSON.parse(legacyRaw || "{}");
+      topics.forEach((topic) => {
+        const completed = saved.topics?.[topic.id]
+          || (topic.id === "powers" ? legacy.completed : []);
+        if (Array.isArray(completed)) {
+          progressByTopic[topic.id] = new Set(completed.filter((item) => Number.isInteger(item) && item >= 0 && item < topic.levels.length));
+        }
+      });
+      const requestedTopic = topics.findIndex((topic) => topic.id === saved.currentTopic);
+      if (requestedTopic >= 0) {
+        currentTopicIndex = requestedTopic;
       }
-      if (heroes[saved.hero]) selectedHero = saved.hero;
-      if (Array.isArray(saved.tips)) seenTips = new Set(saved.tips.filter((item) => typeof item === "string"));
+      const savedHero = saved.hero || legacy.hero;
+      const savedTips = saved.tips || legacy.tips;
+      if (heroes[savedHero]) selectedHero = savedHero;
+      if (Array.isArray(savedTips)) seenTips = new Set(savedTips.filter((item) => typeof item === "string"));
     } catch (_) {
-      completedLevels = new Set();
+      progressByTopic = Object.fromEntries(topics.map((topic) => [topic.id, new Set()]));
       seenTips = new Set();
     }
+    levels = topics[currentTopicIndex].levels;
+    completedLevels = progressByTopic[topics[currentTopicIndex].id];
     const firstIncomplete = levels.findIndex((_, index) => !completedLevels.has(index));
     currentLevelIndex = firstIncomplete < 0 ? levels.length - 1 : firstIncomplete;
   }
@@ -112,11 +134,20 @@
   function saveProgress() {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify({
-        completed: [...completedLevels],
+        currentTopic: topics[currentTopicIndex].id,
+        topics: Object.fromEntries(topics.map((topic) => [topic.id, [...progressByTopic[topic.id]]])),
         hero: selectedHero,
         tips: [...seenTips]
       }));
     } catch (_) {}
+  }
+
+  function visualIndex() {
+    return (currentTopicIndex * 3 + currentLevelIndex) % levelThemes.length;
+  }
+
+  function activeTheme() {
+    return levelThemes[visualIndex()];
   }
 
   function buildLevel(index) {
@@ -146,8 +177,8 @@
     hazards = [];
     springs = [];
     decorations = [];
-    const profile = layoutProfiles[levelIndex];
-    const theme = levelThemes[levelIndex];
+    const profile = layoutProfiles[visualIndex()];
+    const theme = activeTheme();
 
     challenges.forEach((challenge, index) => {
       addCoursePattern(profile[index % profile.length], challenge.gateX);
@@ -159,7 +190,7 @@
       });
     });
 
-    addFinale(levelIndex);
+    addFinale(visualIndex());
   }
 
   function addPlatform(x, y, w, h = 22) {
@@ -238,7 +269,44 @@
     return index > 0 && !completedLevels.has(index - 1);
   }
 
+  function selectTopic(index) {
+    if (!topics[index]) return;
+    currentTopicIndex = index;
+    levels = topics[index].levels;
+    completedLevels = progressByTopic[topics[index].id];
+    const firstIncomplete = levels.findIndex((_, levelIndex) => !completedLevels.has(levelIndex));
+    currentLevelIndex = firstIncomplete < 0 ? levels.length - 1 : firstIncomplete;
+    buildLevel(currentLevelIndex);
+    renderTopicPicker();
+    renderLevelPicker();
+    updateStartButton();
+    saveProgress();
+  }
+
+  function renderTopicPicker() {
+    const activeTopic = topics[currentTopicIndex];
+    ui.topicPicker.replaceChildren();
+    topics.forEach((topic, index) => {
+      const completed = progressByTopic[topic.id].size;
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "topic-choice";
+      button.classList.toggle("selected", index === currentTopicIndex);
+      button.classList.toggle("completed", completed === topic.levels.length);
+      button.setAttribute("aria-pressed", String(index === currentTopicIndex));
+      button.innerHTML = `<span>${topic.grade}</span><strong>${topic.title}</strong><small>${completed} из ${topic.levels.length} уровней${completed === topic.levels.length ? " · ✓ пройдено" : ""}</small>`;
+      button.addEventListener("click", () => {
+        selectTopic(index);
+        beep(440 + index * 80, .08, "triangle", .02);
+      });
+      ui.topicPicker.append(button);
+    });
+    ui.topicKicker.textContent = `Тема: ${activeTopic.title} · ${activeTopic.grade}`;
+    document.title = `Храм математики — ${activeTopic.title}`;
+  }
+
   function renderLevelPicker() {
+    const topic = topics[currentTopicIndex];
     ui.levelPicker.replaceChildren();
     levels.forEach((level, index) => {
       const locked = levelIsLocked(index);
@@ -261,9 +329,10 @@
       ui.levelPicker.append(button);
     });
     const done = completedLevels.size;
+    const taskCount = levels.reduce((sum, level) => sum + level.tasks.length, 0);
     ui.topicProgress.textContent = done === levels.length
-      ? "Тема пройдена! Можно повторить любой из 6 уровней."
-      : `Пройдено уровней: ${done} из ${levels.length}. Всего в теме 24 задания.`;
+      ? `Тема «${topic.title}» пройдена! Можно повторить любой из ${levels.length} уровней.`
+      : `Тема «${topic.title}»: пройдено ${done} из ${levels.length} уровней. Всего ${taskCount} задания.`;
   }
 
   function updateStartButton() {
@@ -557,7 +626,7 @@
     ui.resultKicker.textContent = allDone ? "Тема пройдена" : `Уровень ${currentLevelIndex + 1} пройден`;
     ui.resultTitle.textContent = allDone ? "Ты отлично справился!" : "Отличная работа!";
     ui.resultMessage.textContent = allDone
-      ? "Все задания темы «Степени» решены. Ты прошёл все 6 уровней!"
+      ? `Все задания темы «${topics[currentTopicIndex].title}» решены. Ты прошёл все ${levels.length} уровней!`
       : `Ты решил все задания уровня «${levels[currentLevelIndex].title}». Открыт следующий уровень.`;
     ui.nextLevelButton.hidden = currentLevelIndex >= levels.length - 1;
     ui.missionText.innerHTML = "<strong>Готово:</strong> портал найден!";
@@ -580,7 +649,7 @@
   }
 
   function drawBackground() {
-    const theme = levelThemes[currentLevelIndex];
+    const theme = activeTheme();
     const gradient = ctx.createLinearGradient(0, 0, 0, VIEW_H);
     gradient.addColorStop(0, theme.top);
     gradient.addColorStop(1, theme.bottom);
@@ -625,7 +694,7 @@
       ctx.fillStyle = colors.stone;
       roundedRect(platform.x, platform.y, platform.w, platform.h + 8, 7);
       ctx.fill();
-      ctx.fillStyle = platform.floor ? colors.stoneTop : levelThemes[currentLevelIndex].accent;
+      ctx.fillStyle = platform.floor ? colors.stoneTop : activeTheme().accent;
       ctx.globalAlpha = platform.floor ? 1 : .82;
       ctx.fillRect(platform.x + 4, platform.y, platform.w - 8, 5);
       ctx.globalAlpha = 1;
@@ -654,7 +723,7 @@
   }
 
   function drawDecorations() {
-    const theme = levelThemes[currentLevelIndex];
+    const theme = activeTheme();
     decorations.forEach((decoration) => {
       ctx.save();
       ctx.globalAlpha = .22;
@@ -674,7 +743,7 @@
     ctx.fillStyle = "#26355e";
     roundedRect(spring.x - 4, spring.y + 8, spring.w + 8, 11, 5);
     ctx.fill();
-    ctx.strokeStyle = levelThemes[currentLevelIndex].accent;
+    ctx.strokeStyle = activeTheme().accent;
     ctx.lineWidth = 4;
     ctx.beginPath();
     ctx.moveTo(spring.x + 6, spring.y + 10);
@@ -896,7 +965,7 @@
       inputSchema: { type: "object", properties: {}, additionalProperties: false },
       annotations: { readOnlyHint: true, untrustedContentHint: false },
       execute: () => ({
-        topic: "Степени", level: currentLevelIndex + 1,
+        topic: topics[currentTopicIndex].title, level: currentLevelIndex + 1,
         levelTitle: levels[currentLevelIndex].title,
         completedLevels: [...completedLevels].map((index) => index + 1),
         activeHeroName: heroes[player.type].name, lives,
@@ -932,6 +1001,7 @@
 
   loadProgress();
   buildLevel(currentLevelIndex);
+  renderTopicPicker();
   renderLevelPicker();
   updateStartButton();
   ui.heroChoices.forEach((choice) => {
