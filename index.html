@@ -6,15 +6,15 @@
     <meta name="theme-color" content="#111732" />
     <meta
       name="description"
-      content="Учебная платформенная игра по математике: выбери героя, решай задачи по теме «Степени» и открывай новые уровни."
+      content="Учебная платформенная игра по математике: выбери тему и героя, решай задачи и открывай новые уровни."
     />
     <link
       rel="icon"
       type="image/svg+xml"
       href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='15' fill='%23111732'/%3E%3Ccircle cx='21' cy='21' r='9' fill='%23ff8154'/%3E%3Ccircle cx='43' cy='21' r='9' fill='%2354d7ff'/%3E%3Ccircle cx='21' cy='43' r='9' fill='%23c891ff'/%3E%3Ccircle cx='43' cy='43' r='9' fill='%2365e69d'/%3E%3C/svg%3E"
     />
-    <title>Храм математики — тема «Степени»</title>
-    <link rel="stylesheet" href="./styles.css?v=powers-theme-2" />
+    <title>Храм математики</title>
+    <link rel="stylesheet" href="./styles.css?v=topics-1" />
   </head>
   <body>
     <main class="page-shell">
@@ -70,10 +70,11 @@
           ></canvas>
 
           <div class="start-screen" id="startScreen">
-            <p class="level-kicker">Тема: Степени · 7 класс</p>
-            <h2>Выбери уровень и героя</h2>
-            <p id="topicProgress">Пройди 6 уровней и реши все 24 задания домашней работы.</p>
-            <div class="level-picker" id="levelPicker" role="group" aria-label="Уровни темы «Степени»"></div>
+            <p class="level-kicker" id="topicKicker">Математические приключения</p>
+            <h2>Выбери тему, уровень и героя</h2>
+            <div class="topic-picker" id="topicPicker" role="group" aria-label="Темы игры"></div>
+            <p id="topicProgress">Выбери тему, чтобы увидеть её уровни.</p>
+            <div class="level-picker" id="levelPicker" role="group" aria-label="Уровни выбранной темы"></div>
             <p class="picker-label">Выбери героя</p>
             <div class="hero-picker" role="group" aria-label="Выбор героя">
               <button class="hero-choice selected" type="button" data-hero="fire" aria-pressed="true">
@@ -169,7 +170,7 @@
       <button class="primary-button" id="tryAgainButton" type="button">Вернуться в храм</button>
     </dialog>
 
-    <script src="./levels.js?v=powers-theme-2"></script>
-    <script src="./game.js?v=course-layouts-2"></script>
+    <script src="./levels.js?v=topics-1"></script>
+    <script src="./game.js?v=topics-1"></script>
   </body>
 </html>
