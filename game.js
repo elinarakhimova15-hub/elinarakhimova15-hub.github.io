@@ -44,6 +44,24 @@
     leaf: { name: "Листик", color: colors.leaf, dark: colors.leafDark, tone: 420 }
   };
 
+  const levelThemes = [
+    { top: "#0b1737", bottom: "#13264d", accent: "#68dcff", symbols: ["2⁶", "±", "(−a)ⁿ"] },
+    { top: "#171039", bottom: "#27205a", accent: "#c995ff", symbols: ["aᵐ·aⁿ", "aᵐ⁻ⁿ", "(ab)ⁿ"] },
+    { top: "#29132f", bottom: "#43203d", accent: "#ff8f9e", symbols: ["✎", "?", "≠"] },
+    { top: "#182038", bottom: "#34304d", accent: "#ffd66b", symbols: ["x", "=", "2ˣ"] },
+    { top: "#092a34", bottom: "#124554", accent: "#69e2c2", symbols: [">", "<", "="] },
+    { top: "#21133f", bottom: "#40235c", accent: "#ffbd69", symbols: ["✦", "3²⁰²⁷", "8k+1"] }
+  ];
+
+  const layoutProfiles = [
+    ["hop", "steps", "hop", "bridge", "steps", "hop"],
+    ["bridge", "islands", "steps", "bridge", "spring", "islands"],
+    ["steps", "spring", "tower"],
+    ["tower", "steps", "spring", "tower"],
+    ["islands", "bridge", "spring"],
+    ["spring", "tower"]
+  ];
+
   let audioContext = null;
   let soundOn = true;
   let running = false;
@@ -60,13 +78,16 @@
   let worldWidth = 2360;
   let platforms = [];
   let hazards = [];
+  let springs = [];
+  let decorations = [];
   let portal = { x: 2250, y: 477, occupied: false };
   let completedLevels = new Set();
 
   function makePlayer(type, x = 105) {
     return {
       type, x, y: FLOOR_Y - 44, w: 30, h: 44, vx: 0, vy: 0,
-      onGround: false, checkpointX: x, atGoal: false, invulnerableUntil: 0, step: 0
+      onGround: false, checkpointX: x, atGoal: false, invulnerableUntil: 0,
+      springReadyAt: 0, step: 0
     };
   }
   let player = makePlayer(selectedHero);
@@ -103,11 +124,7 @@
     const lastGate = challenges[challenges.length - 1].gateX;
     worldWidth = lastGate + 470;
     portal = { x: lastGate + 305, y: 477, occupied: false };
-    platforms = [{ x: 0, y: FLOOR_Y, w: worldWidth, h: 75 }];
-    hazards = challenges.map((challenge, indexInLevel) => ({
-      x: challenge.gateX - 300, y: 530, w: indexInLevel % 2 ? 78 : 68, h: 18
-    }));
-    hazards.push({ x: portal.x - 135, y: 530, w: 54, h: 18 });
+    buildCourse(index);
     player = makePlayer(selectedHero);
     lives = 3;
     cameraX = 0;
@@ -115,6 +132,99 @@
     lastDeath = null;
     renderGateProgress();
     updateHud();
+  }
+
+  function buildCourse(levelIndex) {
+    platforms = [{ x: 0, y: FLOOR_Y, w: worldWidth, h: 75, floor: true }];
+    hazards = [];
+    springs = [];
+    decorations = [];
+    const profile = layoutProfiles[levelIndex];
+    const theme = levelThemes[levelIndex];
+
+    challenges.forEach((challenge, index) => {
+      addCoursePattern(profile[index % profile.length], challenge.gateX);
+      decorations.push({
+        x: challenge.gateX - 425,
+        y: 205 + (index % 2) * 72,
+        symbol: theme.symbols[index % theme.symbols.length],
+        size: index % 2 ? 30 : 36
+      });
+    });
+
+    addFinale(levelIndex);
+  }
+
+  function addPlatform(x, y, w, h = 22) {
+    platforms.push({ x, y, w, h });
+  }
+
+  function addHazard(x, w) {
+    hazards.push({ x, y: 530, w, h: 18 });
+  }
+
+  function addSpring(x) {
+    springs.push({ x, y: 526, w: 44, h: 19, used: false });
+  }
+
+  function addCoursePattern(pattern, gateX) {
+    if (pattern === "hop") {
+      addHazard(gateX - 305, 70);
+      addPlatform(gateX - 342, 447, 142);
+      return;
+    }
+    if (pattern === "steps") {
+      addPlatform(gateX - 400, 472, 105);
+      addPlatform(gateX - 258, 398, 112);
+      addHazard(gateX - 292, 78);
+      return;
+    }
+    if (pattern === "bridge") {
+      addHazard(gateX - 370, 160);
+      addPlatform(gateX - 382, 438, 88);
+      addPlatform(gateX - 254, 438, 88);
+      return;
+    }
+    if (pattern === "tower") {
+      addPlatform(gateX - 425, 474, 92);
+      addPlatform(gateX - 310, 407, 92);
+      addPlatform(gateX - 195, 340, 80);
+      addHazard(gateX - 292, 92);
+      return;
+    }
+    if (pattern === "spring") {
+      addSpring(gateX - 400);
+      addHazard(gateX - 320, 135);
+      addPlatform(gateX - 298, 360, 142);
+      return;
+    }
+    addHazard(gateX - 392, 205);
+    addPlatform(gateX - 382, 458, 76);
+    addPlatform(gateX - 274, 397, 76);
+    addPlatform(gateX - 166, 458, 76);
+  }
+
+  function addFinale(levelIndex) {
+    if (levelIndex === 0) {
+      addHazard(portal.x - 135, 52);
+    } else if (levelIndex === 1) {
+      addHazard(portal.x - 205, 135);
+      addPlatform(portal.x - 220, 445, 102);
+    } else if (levelIndex === 2) {
+      addSpring(portal.x - 245);
+      addHazard(portal.x - 170, 96);
+    } else if (levelIndex === 3) {
+      addPlatform(portal.x - 250, 472, 100);
+      addPlatform(portal.x - 135, 405, 92);
+    } else if (levelIndex === 4) {
+      addHazard(portal.x - 225, 158);
+      addPlatform(portal.x - 238, 438, 86);
+      addPlatform(portal.x - 116, 438, 72);
+    } else {
+      addSpring(portal.x - 255);
+      addHazard(portal.x - 180, 108);
+      addPlatform(portal.x - 166, 365, 118);
+    }
   }
 
   function levelIsLocked(index) {
@@ -386,6 +496,19 @@
         activePlayer.vx = 0;
       }
     }
+    const now = performance.now();
+    for (const spring of springs) {
+      if (now < activePlayer.springReadyAt || activePlayer.vy < 0 || !overlaps(activePlayer, spring)) continue;
+      activePlayer.y = spring.y - activePlayer.h - 2;
+      activePlayer.vy = -760;
+      activePlayer.onGround = false;
+      activePlayer.springReadyAt = now + 650;
+      if (!spring.used) {
+        spring.used = true;
+        showToast("Пружинная платформа — держи направление в прыжке!");
+      }
+      beep(760, .12, "triangle", .035);
+    }
     if (activePlayer.y > VIEW_H + 100) loseLife(activePlayer, "Осторожно, здесь обрыв!");
     hazards.forEach((hazard) => { if (overlaps(activePlayer, hazard)) loseLife(activePlayer, "Перепрыгни энергетическую ловушку!"); });
     challenges.forEach((challenge) => {
@@ -439,9 +562,10 @@
   }
 
   function drawBackground() {
+    const theme = levelThemes[currentLevelIndex];
     const gradient = ctx.createLinearGradient(0, 0, 0, VIEW_H);
-    gradient.addColorStop(0, "#0b1331");
-    gradient.addColorStop(1, "#101b3a");
+    gradient.addColorStop(0, theme.top);
+    gradient.addColorStop(1, theme.bottom);
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, VIEW_W, VIEW_H);
     ctx.save();
@@ -457,6 +581,16 @@
       ctx.fill();
     }
     ctx.restore();
+    ctx.save();
+    ctx.globalAlpha = .09;
+    ctx.fillStyle = theme.accent;
+    ctx.font = "800 34px system-ui";
+    ctx.textAlign = "center";
+    ctx.translate(-(cameraX * .22) % 310, 0);
+    for (let x = 40, index = 0; x < VIEW_W + 620; x += 310, index += 1) {
+      ctx.fillText(theme.symbols[index % theme.symbols.length], x, 95 + (index % 3) * 112);
+    }
+    ctx.restore();
   }
 
   function drawWorld() {
@@ -468,12 +602,19 @@
       ctx.beginPath();
       ctx.moveTo(x, 140); ctx.lineTo(x + 16, 124); ctx.lineTo(x + 32, 140); ctx.lineTo(x + 16, 156); ctx.closePath(); ctx.stroke();
     }
+    drawDecorations();
     platforms.forEach((platform) => {
       ctx.fillStyle = colors.stone;
       roundedRect(platform.x, platform.y, platform.w, platform.h + 8, 7);
       ctx.fill();
-      ctx.fillStyle = colors.stoneTop;
+      ctx.fillStyle = platform.floor ? colors.stoneTop : levelThemes[currentLevelIndex].accent;
+      ctx.globalAlpha = platform.floor ? 1 : .82;
       ctx.fillRect(platform.x + 4, platform.y, platform.w - 8, 5);
+      ctx.globalAlpha = 1;
+      if (!platform.floor) {
+        ctx.fillStyle = "rgba(255,255,255,.06)";
+        ctx.fillRect(platform.x + 12, platform.y + 10, Math.max(12, platform.w - 24), 3);
+      }
     });
     hazards.forEach((hazard) => {
       ctx.fillStyle = colors.hazard;
@@ -487,9 +628,48 @@
       ctx.fill();
       ctx.shadowBlur = 0;
     });
+    springs.forEach(drawSpring);
     challenges.forEach(drawChallenge);
     drawPortal();
     drawPlayer(player);
+    ctx.restore();
+  }
+
+  function drawDecorations() {
+    const theme = levelThemes[currentLevelIndex];
+    decorations.forEach((decoration) => {
+      ctx.save();
+      ctx.globalAlpha = .22;
+      ctx.fillStyle = theme.accent;
+      ctx.shadowColor = theme.accent;
+      ctx.shadowBlur = 16;
+      ctx.font = `800 ${decoration.size}px system-ui`;
+      ctx.textAlign = "center";
+      ctx.fillText(decoration.symbol, decoration.x, decoration.y);
+      ctx.restore();
+    });
+  }
+
+  function drawSpring(spring) {
+    const bounce = Math.sin(performance.now() / 120) * 1.5;
+    ctx.save();
+    ctx.fillStyle = "#26355e";
+    roundedRect(spring.x - 4, spring.y + 8, spring.w + 8, 11, 5);
+    ctx.fill();
+    ctx.strokeStyle = levelThemes[currentLevelIndex].accent;
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.moveTo(spring.x + 6, spring.y + 10);
+    ctx.lineTo(spring.x + 14, spring.y + 3);
+    ctx.lineTo(spring.x + 22, spring.y + 10);
+    ctx.lineTo(spring.x + 30, spring.y + 3);
+    ctx.lineTo(spring.x + 38, spring.y + 10);
+    ctx.stroke();
+    ctx.fillStyle = colors.good;
+    ctx.shadowColor = colors.good;
+    ctx.shadowBlur = 13;
+    roundedRect(spring.x, spring.y - 1 + bounce, spring.w, 7, 4);
+    ctx.fill();
     ctx.restore();
   }
 
