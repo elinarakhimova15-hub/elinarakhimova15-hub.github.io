@@ -332,7 +332,7 @@
     const taskCount = levels.reduce((sum, level) => sum + level.tasks.length, 0);
     ui.topicProgress.textContent = done === levels.length
       ? `Тема «${topic.title}» пройдена! Можно повторить любой из ${levels.length} уровней.`
-      : `Тема «${topic.title}»: пройдено ${done} из ${levels.length} уровней. Всего ${taskCount} задания.`;
+      : `Тема «${topic.title}»: пройдено ${done} из ${levels.length} уровней. Всего ${taskCount} ${plural(taskCount, "задание", "задания", "заданий")}.`;
   }
 
   function updateStartButton() {
