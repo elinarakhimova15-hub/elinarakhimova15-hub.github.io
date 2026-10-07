@@ -82,6 +82,7 @@
   let decorations = [];
   let portal = { x: 2250, y: 477, occupied: false };
   let completedLevels = new Set();
+  let seenTips = new Set();
 
   function makePlayer(type, x = 105) {
     return {
@@ -99,8 +100,10 @@
         completedLevels = new Set(saved.completed.filter((item) => Number.isInteger(item) && item >= 0 && item < levels.length));
       }
       if (heroes[saved.hero]) selectedHero = saved.hero;
+      if (Array.isArray(saved.tips)) seenTips = new Set(saved.tips.filter((item) => typeof item === "string"));
     } catch (_) {
       completedLevels = new Set();
+      seenTips = new Set();
     }
     const firstIncomplete = levels.findIndex((_, index) => !completedLevels.has(index));
     currentLevelIndex = firstIncomplete < 0 ? levels.length - 1 : firstIncomplete;
@@ -108,7 +111,11 @@
 
   function saveProgress() {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ completed: [...completedLevels], hero: selectedHero }));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({
+        completed: [...completedLevels],
+        hero: selectedHero,
+        tips: [...seenTips]
+      }));
     } catch (_) {}
   }
 
@@ -287,7 +294,8 @@
     if (ui.failDialog.open) ui.failDialog.close();
     if (ui.challengeDialog.open) ui.challengeDialog.close();
     ui.startScreen.hidden = start;
-    showToast(start ? "Найди первый светящийся пульт" : "");
+    showToast("");
+    if (start) showTipOnce("find-console", "Найди первый светящийся пульт");
     if (start) {
       canvas.focus();
       lastTime = performance.now();
@@ -334,6 +342,14 @@
     ui.toast.classList.toggle("danger", danger);
     ui.toast.hidden = false;
     toastTimer = setTimeout(() => { ui.toast.hidden = true; }, 2600);
+  }
+
+  function showTipOnce(id, message, danger = false) {
+    if (seenTips.has(id)) return false;
+    seenTips.add(id);
+    saveProgress();
+    showToast(message, danger);
+    return true;
   }
 
   function beep(frequency, duration = .12, type = "sine", gain = .04) {
@@ -412,7 +428,7 @@
       if (ui.challengeDialog.open) ui.challengeDialog.close();
       paused = false;
       canvas.focus();
-      showToast(`Задание ${solvedIndex + 1} решено — дверь открыта!`);
+      showTipOnce("task-solved", "Задание решено — дверь открыта!");
     }, 1650);
     return { correct: true, challenge: solvedIndex + 1 };
   }
@@ -428,7 +444,7 @@
     return submitChoice(index);
   }
 
-  function loseLife(activePlayer, message) {
+  function loseLife(activePlayer, message, tipId = "danger") {
     if (activePlayer.atGoal || performance.now() < activePlayer.invulnerableUntil) return;
     activePlayer.invulnerableUntil = performance.now() + 900;
     lastDeath = { type: activePlayer.type, x: Math.round(activePlayer.x), y: Math.round(activePlayer.y), message };
@@ -445,7 +461,7 @@
     activePlayer.y = FLOOR_Y - activePlayer.h;
     activePlayer.vx = 0;
     activePlayer.vy = 0;
-    showToast(message, true);
+    showTipOnce(tipId, message, true);
   }
 
   function overlaps(a, b) {
@@ -505,12 +521,14 @@
       activePlayer.springReadyAt = now + 650;
       if (!spring.used) {
         spring.used = true;
-        showToast("Пружинная платформа — держи направление в прыжке!");
+        showTipOnce("spring", "Пружинная платформа — держи направление в прыжке!");
       }
       beep(760, .12, "triangle", .035);
     }
-    if (activePlayer.y > VIEW_H + 100) loseLife(activePlayer, "Осторожно, здесь обрыв!");
-    hazards.forEach((hazard) => { if (overlaps(activePlayer, hazard)) loseLife(activePlayer, "Перепрыгни энергетическую ловушку!"); });
+    if (activePlayer.y > VIEW_H + 100) loseLife(activePlayer, "Осторожно, здесь обрыв!", "fall");
+    hazards.forEach((hazard) => {
+      if (overlaps(activePlayer, hazard)) loseLife(activePlayer, "Перепрыгни энергетическую ловушку!", "hazard");
+    });
     challenges.forEach((challenge) => {
       if (challenge.solved && activePlayer.x > challenge.gateX + 55) activePlayer.checkpointX = Math.max(activePlayer.checkpointX, challenge.gateX + 70);
     });
