@@ -23,7 +23,10 @@
     challengeDialog: byId("challengeDialog"), challengeForm: byId("challengeForm"),
     challengeNumber: byId("challengeNumber"), challengeTitle: byId("challengeTitle"),
     challengeQuestion: byId("challengeQuestion"), challengeIcon: byId("challengeIcon"),
-    choiceGrid: byId("choiceGrid"), answerFeedback: byId("answerFeedback"),
+    answerLabel: byId("answerLabel"), choiceGrid: byId("choiceGrid"),
+    writtenAnswer: byId("writtenAnswer"), writtenAnswerInput: byId("writtenAnswerInput"),
+    saveWrittenAnswer: byId("saveWrittenAnswer"), copyWrittenAnswer: byId("copyWrittenAnswer"),
+    answerFeedback: byId("answerFeedback"),
     hintButton: byId("hintButton"), hintBox: byId("hintBox"),
     resultDialog: byId("resultDialog"), resultKicker: byId("resultKicker"),
     resultTitle: byId("resultTitle"), resultMessage: byId("resultMessage"),
@@ -90,6 +93,7 @@
   let progressByTopic = Object.fromEntries(topics.map((topic) => [topic.id, new Set()]));
   let completedLevels = progressByTopic[topics[currentTopicIndex].id];
   let seenTips = new Set();
+  let writtenAnswers = {};
 
   function makePlayer(type, x = 105) {
     return {
@@ -121,9 +125,14 @@
       const savedTips = saved.tips || legacy.tips;
       if (heroes[savedHero]) selectedHero = savedHero;
       if (Array.isArray(savedTips)) seenTips = new Set(savedTips.filter((item) => typeof item === "string"));
+      if (saved.writtenAnswers && typeof saved.writtenAnswers === "object") {
+        writtenAnswers = Object.fromEntries(Object.entries(saved.writtenAnswers)
+          .filter(([key, value]) => typeof key === "string" && typeof value === "string"));
+      }
     } catch (_) {
       progressByTopic = Object.fromEntries(topics.map((topic) => [topic.id, new Set()]));
       seenTips = new Set();
+      writtenAnswers = {};
     }
     levels = topics[currentTopicIndex].levels;
     completedLevels = progressByTopic[topics[currentTopicIndex].id];
@@ -137,7 +146,8 @@
         currentTopic: topics[currentTopicIndex].id,
         topics: Object.fromEntries(topics.map((topic) => [topic.id, [...progressByTopic[topic.id]]])),
         hero: selectedHero,
-        tips: [...seenTips]
+        tips: [...seenTips],
+        writtenAnswers
       }));
     } catch (_) {}
   }
@@ -458,17 +468,79 @@
     ui.hintBox.hidden = true;
     ui.hintButton.textContent = "Показать подсказку";
     ui.choiceGrid.replaceChildren();
-    challenge.choices.forEach((choice, choiceIndex) => {
-      const button = document.createElement("button");
-      button.type = "button";
-      button.className = "choice-button";
-      button.innerHTML = choice;
-      button.addEventListener("click", () => submitChoice(choiceIndex, button));
-      ui.choiceGrid.append(button);
-    });
+    const isWritten = challenge.responseType === "proof";
+    ui.answerLabel.textContent = isWritten ? "Твой развёрнутый ответ" : "Выбери ответ";
+    ui.choiceGrid.hidden = isWritten;
+    ui.writtenAnswer.hidden = !isWritten;
+    if (isWritten) {
+      const savedAnswer = writtenAnswers[writtenAnswerKey()] || "";
+      ui.writtenAnswerInput.value = savedAnswer;
+      ui.writtenAnswerInput.removeAttribute("aria-invalid");
+      ui.saveWrittenAnswer.disabled = false;
+      ui.saveWrittenAnswer.textContent = savedAnswer ? "Обновить ответ" : "Сохранить ответ";
+      ui.copyWrittenAnswer.hidden = !savedAnswer;
+    } else {
+      challenge.choices.forEach((choice, choiceIndex) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "choice-button";
+        button.innerHTML = choice;
+        button.addEventListener("click", () => submitChoice(choiceIndex, button));
+        ui.choiceGrid.append(button);
+      });
+    }
     if (!ui.challengeDialog.open) ui.challengeDialog.showModal();
-    requestAnimationFrame(() => ui.choiceGrid.querySelector("button")?.focus());
+    requestAnimationFrame(() => (isWritten ? ui.writtenAnswerInput : ui.choiceGrid.querySelector("button"))?.focus());
     return true;
+  }
+
+  function writtenAnswerKey() {
+    return `${topics[currentTopicIndex].id}:${currentLevelIndex}:${currentChallenge}`;
+  }
+
+  function submitWrittenAnswer(value = ui.writtenAnswerInput.value) {
+    if (currentChallenge === null) return { correct: false, reason: "Нет открытого задания" };
+    const challenge = challenges[currentChallenge];
+    if (challenge.responseType !== "proof") return { correct: false, reason: "Это задание с выбором ответа" };
+    const answer = String(value).trim();
+    if (answer.length < (challenge.minLength || 10)) {
+      ui.writtenAnswerInput.setAttribute("aria-invalid", "true");
+      ui.answerFeedback.textContent = "Добавь объяснение: одного короткого ответа недостаточно для доказательства.";
+      ui.answerFeedback.className = "feedback bad";
+      return { correct: false, challenge: currentChallenge + 1, reason: "Ответ слишком короткий" };
+    }
+    ui.writtenAnswerInput.removeAttribute("aria-invalid");
+    writtenAnswers[writtenAnswerKey()] = answer;
+    challenge.solved = true;
+    saveProgress();
+    ui.saveWrittenAnswer.disabled = true;
+    ui.saveWrittenAnswer.textContent = "Ответ сохранён";
+    ui.copyWrittenAnswer.hidden = false;
+    ui.answerFeedback.textContent = "Ответ сохранён — дверь открыта. Скопируй его для учителя или закрой окно и продолжай игру.";
+    ui.answerFeedback.className = "feedback good";
+    updateHud();
+    beep(660, .12, "sine", .04);
+    setTimeout(() => beep(880, .16, "sine", .035), 90);
+    return { correct: true, challenge: currentChallenge + 1, savedLocally: true };
+  }
+
+  async function copyWrittenAnswer() {
+    if (currentChallenge === null) return;
+    const challenge = challenges[currentChallenge];
+    const answer = writtenAnswers[writtenAnswerKey()] || ui.writtenAnswerInput.value.trim();
+    if (!answer) return;
+    const plainQuestion = challenge.question.replace(/<[^>]*>/g, "");
+    const text = `Тема: ${topics[currentTopicIndex].title}\nЗадание: ${plainQuestion}\n\nОтвет ученика:\n${answer}`;
+    try {
+      await navigator.clipboard.writeText(text);
+      ui.answerFeedback.textContent = "Ответ скопирован. Теперь его можно вставить в сообщение учителю.";
+      ui.answerFeedback.className = "feedback good";
+    } catch (_) {
+      ui.writtenAnswerInput.focus();
+      ui.writtenAnswerInput.select();
+      ui.answerFeedback.textContent = "Выделила ответ. Скопируй его обычной командой браузера.";
+      ui.answerFeedback.className = "feedback good";
+    }
   }
 
   function submitChoice(choiceIndex, clickedButton = null) {
@@ -509,6 +581,7 @@
   function submitTextAnswer(value) {
     if (currentChallenge === null) return { correct: false, reason: "Нет открытого задания" };
     const challenge = challenges[currentChallenge];
+    if (challenge.responseType === "proof") return submitWrittenAnswer(value);
     const index = challenge.choices.findIndex((choice) => normalizeText(choice) === normalizeText(value));
     return submitChoice(index);
   }
@@ -940,6 +1013,8 @@
     ui.hintBox.hidden = !ui.hintBox.hidden;
     ui.hintButton.textContent = ui.hintBox.hidden ? "Показать подсказку" : "Скрыть подсказку";
   });
+  ui.saveWrittenAnswer.addEventListener("click", () => submitWrittenAnswer());
+  ui.copyWrittenAnswer.addEventListener("click", () => { void copyWrittenAnswer(); });
 
   document.querySelectorAll("[data-control]").forEach((button) => {
     const control = button.dataset.control;
@@ -977,7 +1052,7 @@
     register({
       name: "submit_math_answer",
       title: "Ответить на математическую задачу",
-      description: "Проверяет текст выбранного варианта ответа в текущем уровне.",
+      description: "Проверяет выбранный вариант или сохраняет развёрнутый ответ в текущем уровне.",
       inputSchema: {
         type: "object",
         properties: {
