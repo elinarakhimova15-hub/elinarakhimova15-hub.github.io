@@ -1204,7 +1204,7 @@ window.MATH_TOPICS = [
   {
     id: "proportions",
     title: "Пропорции",
-    grade: "6 класс",
+    grade: "7 класс",
     description: "6 уровней · 16 заданий",
     levels: PROPORTIONS_LEVELS
   },
