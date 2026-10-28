@@ -1,3 +1,4 @@
+/opt/homebrew/Library/Homebrew/cmd/shellenv.sh: line 18: /bin/ps: Operation not permitted
 <!doctype html>
 <html lang="ru">
   <head>
@@ -14,7 +15,7 @@
       href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='15' fill='%23111732'/%3E%3Ccircle cx='21' cy='21' r='9' fill='%23ff8154'/%3E%3Ccircle cx='43' cy='21' r='9' fill='%2354d7ff'/%3E%3Ccircle cx='21' cy='43' r='9' fill='%23c891ff'/%3E%3Ccircle cx='43' cy='43' r='9' fill='%2365e69d'/%3E%3C/svg%3E"
     />
     <title>Храм математики</title>
-    <link rel="stylesheet" href="./styles.css?v=topics-13" />
+    <link rel="stylesheet" href="./styles.css?v=topics-14" />
   </head>
   <body>
     <main class="page-shell">
@@ -139,8 +140,12 @@
         <div class="challenge-icon" id="challengeIcon" aria-hidden="true">✦</div>
         <h2 id="challengeTitle">Зал порядка</h2>
         <p class="challenge-question" id="challengeQuestion"></p>
-        <p class="answer-label">Выбери ответ</p>
+        <p class="answer-label" id="answerLabel">Выбери ответ</p>
         <div class="choice-grid" id="choiceGrid" role="group" aria-label="Варианты ответа"></div>
+        <div class="answer-row" id="answerRow" hidden>
+          <input id="answerInput" type="text" autocomplete="off" aria-label="Ответ" />
+          <button class="primary-button" id="checkAnswerButton" type="button">Проверить</button>
+        </div>
         <p class="feedback" id="answerFeedback" aria-live="polite"></p>
         <button class="hint-button" id="hintButton" type="button">Показать подсказку</button>
         <div class="hint-box" id="hintBox" hidden></div>
@@ -170,7 +175,7 @@
       <button class="primary-button" id="tryAgainButton" type="button">Вернуться в храм</button>
     </dialog>
 
-    <script src="./levels.js?v=topics-13"></script>
-    <script src="./game.js?v=topics-13"></script>
+    <script src="./levels.js?v=topics-14"></script>
+    <script src="./game.js?v=topics-14"></script>
   </body>
 </html>
