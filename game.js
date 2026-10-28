@@ -1,3 +1,4 @@
+/opt/homebrew/Library/Homebrew/cmd/shellenv.sh: line 18: /bin/ps: Operation not permitted
 (() => {
   "use strict";
 
@@ -23,7 +24,9 @@
     challengeDialog: byId("challengeDialog"), challengeForm: byId("challengeForm"),
     challengeNumber: byId("challengeNumber"), challengeTitle: byId("challengeTitle"),
     challengeQuestion: byId("challengeQuestion"), challengeIcon: byId("challengeIcon"),
-    choiceGrid: byId("choiceGrid"), answerFeedback: byId("answerFeedback"),
+    answerLabel: byId("answerLabel"), choiceGrid: byId("choiceGrid"),
+    answerRow: byId("answerRow"), answerInput: byId("answerInput"),
+    checkAnswerButton: byId("checkAnswerButton"), answerFeedback: byId("answerFeedback"),
     hintButton: byId("hintButton"), hintBox: byId("hintBox"),
     resultDialog: byId("resultDialog"), resultKicker: byId("resultKicker"),
     resultTitle: byId("resultTitle"), resultMessage: byId("resultMessage"),
@@ -458,34 +461,57 @@
     ui.hintBox.hidden = true;
     ui.hintButton.textContent = "Показать подсказку";
     ui.choiceGrid.replaceChildren();
-    challenge.choices.forEach((choice, choiceIndex) => {
-      const button = document.createElement("button");
-      button.type = "button";
-      button.className = "choice-button";
-      button.innerHTML = choice;
-      button.addEventListener("click", () => submitChoice(choiceIndex, button));
-      ui.choiceGrid.append(button);
-    });
+    const usesFreeAnswer = Object.hasOwn(challenge, "answer") || Array.isArray(challenge.answers);
+    ui.answerLabel.textContent = usesFreeAnswer ? "Введи ответ" : "Выбери ответ";
+    ui.choiceGrid.hidden = usesFreeAnswer;
+    ui.answerRow.hidden = !usesFreeAnswer;
+    ui.answerInput.value = "";
+    ui.answerInput.disabled = false;
+    ui.answerInput.removeAttribute("aria-invalid");
+    ui.answerInput.inputMode = challenge.inputMode || "text";
+    ui.answerInput.placeholder = challenge.placeholder || "Напиши ответ";
+    ui.checkAnswerButton.disabled = false;
+    if (!usesFreeAnswer) {
+      challenge.choices.forEach((choice, choiceIndex) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "choice-button";
+        button.innerHTML = choice;
+        button.addEventListener("click", () => submitChoice(choiceIndex, button));
+        ui.choiceGrid.append(button);
+      });
+    }
     if (!ui.challengeDialog.open) ui.challengeDialog.showModal();
-    requestAnimationFrame(() => ui.choiceGrid.querySelector("button")?.focus());
+    requestAnimationFrame(() => {
+      if (usesFreeAnswer) ui.answerInput.focus();
+      else ui.choiceGrid.querySelector("button")?.focus();
+    });
     return true;
   }
 
-  function submitChoice(choiceIndex, clickedButton = null) {
+  function showWrongAnswer(clickedButton = null) {
+    clickedButton?.classList.add("wrong");
+    if (!ui.answerRow.hidden) ui.answerInput.setAttribute("aria-invalid", "true");
+    ui.answerFeedback.textContent = "Пока не сходится. Проверь решение или открой подсказку.";
+    ui.answerFeedback.className = "feedback bad";
+    beep(150, .17, "sawtooth", .025);
+    return { correct: false, challenge: currentChallenge + 1 };
+  }
+
+  function finishChallenge() {
     if (currentChallenge === null) return { correct: false, reason: "Нет открытого задания" };
     const challenge = challenges[currentChallenge];
-    if (choiceIndex !== challenge.correct) {
-      clickedButton?.classList.add("wrong");
-      ui.answerFeedback.textContent = "Пока не сходится. Проверь решение или открой подсказку.";
-      ui.answerFeedback.className = "feedback bad";
-      beep(150, .17, "sawtooth", .025);
-      return { correct: false, challenge: currentChallenge + 1 };
-    }
     challenge.solved = true;
-    [...ui.choiceGrid.children].forEach((button, index) => {
-      button.disabled = true;
-      button.classList.toggle("correct", index === challenge.correct);
-    });
+    if (Array.isArray(challenge.choices)) {
+      [...ui.choiceGrid.children].forEach((button, index) => {
+        button.disabled = true;
+        button.classList.toggle("correct", index === challenge.correct);
+      });
+    } else {
+      ui.answerInput.disabled = true;
+      ui.answerInput.removeAttribute("aria-invalid");
+      ui.checkAnswerButton.disabled = true;
+    }
     ui.answerFeedback.innerHTML = `Верно! ${challenge.solution}`;
     ui.answerFeedback.className = "feedback good";
     updateHud();
@@ -502,13 +528,40 @@
     return { correct: true, challenge: solvedIndex + 1 };
   }
 
+  function submitChoice(choiceIndex, clickedButton = null) {
+    if (currentChallenge === null) return { correct: false, reason: "Нет открытого задания" };
+    const challenge = challenges[currentChallenge];
+    if (choiceIndex !== challenge.correct) return showWrongAnswer(clickedButton);
+    return finishChallenge();
+  }
+
   function normalizeText(value) {
     return String(value).replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim().toLowerCase();
+  }
+
+  function normalizeAnswer(value) {
+    return normalizeText(value).replace(/\s+/g, "").replace(",", ".");
+  }
+
+  function submitFreeAnswer(value) {
+    if (currentChallenge === null) return { correct: false, reason: "Нет открытого задания" };
+    const challenge = challenges[currentChallenge];
+    const entered = normalizeAnswer(value);
+    if (!entered) {
+      ui.answerInput.setAttribute("aria-invalid", "true");
+      ui.answerFeedback.textContent = "Сначала введи ответ.";
+      ui.answerFeedback.className = "feedback bad";
+      return { correct: false, challenge: currentChallenge + 1 };
+    }
+    const acceptedAnswers = (challenge.answers || [challenge.answer]).map(normalizeAnswer);
+    if (!acceptedAnswers.includes(entered)) return showWrongAnswer();
+    return finishChallenge();
   }
 
   function submitTextAnswer(value) {
     if (currentChallenge === null) return { correct: false, reason: "Нет открытого задания" };
     const challenge = challenges[currentChallenge];
+    if (Object.hasOwn(challenge, "answer") || Array.isArray(challenge.answers)) return submitFreeAnswer(value);
     const index = challenge.choices.findIndex((choice) => normalizeText(choice) === normalizeText(value));
     return submitChoice(index);
   }
@@ -940,6 +993,13 @@
     ui.hintBox.hidden = !ui.hintBox.hidden;
     ui.hintButton.textContent = ui.hintBox.hidden ? "Показать подсказку" : "Скрыть подсказку";
   });
+  ui.checkAnswerButton.addEventListener("click", () => submitFreeAnswer(ui.answerInput.value));
+  ui.answerInput.addEventListener("input", () => ui.answerInput.removeAttribute("aria-invalid"));
+  ui.answerInput.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter") return;
+    event.preventDefault();
+    submitFreeAnswer(ui.answerInput.value);
+  });
   document.querySelectorAll("[data-control]").forEach((button) => {
     const control = button.dataset.control;
     const key = control === "left" ? "touchLeft" : control === "right" ? "touchRight" : "touchJump";
@@ -976,7 +1036,7 @@
     register({
       name: "submit_math_answer",
       title: "Ответить на математическую задачу",
-      description: "Проверяет текст выбранного варианта ответа в текущем уровне.",
+      description: "Проверяет выбранный или самостоятельно введённый ответ в текущем уровне.",
       inputSchema: {
         type: "object",
         properties: {
