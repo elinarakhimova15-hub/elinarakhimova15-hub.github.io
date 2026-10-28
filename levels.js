@@ -1,3 +1,4 @@
+/opt/homebrew/Library/Homebrew/cmd/shellenv.sh: line 18: /bin/ps: Operation not permitted
 const POWERS_LEVELS = [
   {
     title: "Значение и знак",
@@ -1348,8 +1349,9 @@ const DECIMAL_NOTATION_LEVELS = [
       },
       {
         question: "Составь наибольшее четырёхзначное число из цифр 7, 0, 4, 2, используя каждую один раз.",
-        choices: ["7240", "7402", "7420", "7042"],
-        correct: 2,
+        answer: "7420",
+        inputMode: "numeric",
+        placeholder: "Введи четырёхзначное число",
         hint: "Для наибольшего числа располагай цифры от большей к меньшей.",
         solution: "Цифры по убыванию: 7, 4, 2, 0. Получаем 7420."
       },
